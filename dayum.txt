@@ -1,0 +1,751 @@
+using System; //Imports the .NET System namespace
+using System.Collections;
+using System.Collections.Generic; //Imports the System.Collections.Generic namespace
+using System.Diagnostics; //Imports the System.Diagnostics namespace
+using System.Management; //Imports the System.Management namespace
+using System.Runtime.InteropServices; //Imports the System.Runtime.InteropServices namespace
+using System.Windows.Forms; //Imports the System.Windows.Forms namespace
+using static WindowsFormsApp12.Form2; //Imports the static class Form2 in the namespace WindowsFormsApp12
+namespace WindowsFormsApp12 //Declares the namespace for this project as "WindowsFormsApp12"
+{
+    public partial class Form1 : Form //Declares a partial public class named "Form1" that inherits from the Form class
+    {
+        private readonly List<string> _connectedDevices = new List<string>(); //Declares a readonly list of strings named "_connectedDevices" and initializes it as an empty list
+        private readonly ManagementEventWatcher _watcher; //Declares a readonly instance of ManagementEventWatcher named "_watcher"
+        public Form1() {  //Declares a public constructor for the Form1 class
+        InitializeComponent(); //Initializes the component for this form
+        var query = new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 2"); //Declares a variable of type WqlEventQuery with the query "SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 2"
+        _watcher = new ManagementEventWatcher(query); //Initializes the "_watcher" variable with the specified query
+        _watcher.EventArrived += WatcherOnEventArrived; //Assigns the "WatcherOnEventArrived" method to the EventArrived event of "_watcher"
+        _watcher.Start(); //Starts the "_watcher" event
+        }
+
+        private void WatcherOnEventArrived(object sender, EventArrivedEventArgs e) //Declares the "WatcherOnEventArrived" method that is triggered when an event arrives
+        {
+            UpdateConnectedDevices(); //Calls the "UpdateConnectedDevices" method
+            if (_connectedDevices.Count > 0) //Checks if the count of "_connectedDevices" is greater than 0
+            {
+                if (button1.InvokeRequired) //Checks if the Invoke method is required to be called for the "button1" object
+                {
+                    button1.Invoke((MethodInvoker)delegate //Invokes the delegate method to call the "PerformClick" method on the "button1" object
+                    {
+                        button1.PerformClick(); //Calls the "PerformClick" method on the "button1" object
+                    });
+                }
+                else
+                {
+                    button1.PerformClick(); //Calls the "PerformClick" method on the "button1" object
+                }
+            }
+
+
+
+        }
+        private void UpdateConnectedDevices() //Declares the "UpdateConnectedDevices" method
+        {
+            _connectedDevices.Clear(); //Clears the "_connectedDevices" list
+            var searcher = new ManagementObjectSearcher("SELECT DeviceID FROM Win32_USBHub"); //Declares a variable of type ManagementObjectSearcher and sets the query to select the device ID from the Win32_USBHub class.
+
+            foreach (var device in searcher.Get()) //Iterates through the result of the query
+            {
+                _connectedDevices.Add(device["DeviceID"].ToString()); //Adds the device ID to the "_connectedDevices" list
+            }
+        }
+
+        private void button1_Click(object sender, EventArgs e) //Event handler for the button1 click event
+        {
+            bool form2Open = false; //Flag to check if Form2 is already open
+            foreach (Form f in Application.OpenForms) //Iterates through all the open forms
+            {
+                if (f is Form2) //Checks if the form is of type Form2
+                {
+                    form2Open = true; //Sets the flag to true
+                    break;
+                }
+            }
+
+            if (!form2Open) //If the form2 is not open
+            {
+                Form2 form2 = new Form2(); //Create a new instance of Form2
+                form2.Show(); //Show the form
+            }
+        }
+
+
+        private void label1_Click(object sender, EventArgs e) //Event handler for the label1 click event
+        {
+
+        }
+
+        private void label4_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+    }
+}using System; //import the System namespace
+using System.Collections.Generic; //import the System.Collections.Generic namespace
+using System.Diagnostics; //import the System.Diagnostics namespace
+using System.Management; //import the System.Management namespace
+using System.Reflection.Emit; //import the System.Reflection.Emit namespace
+using System.Runtime.InteropServices; //import the System.Runtime.InteropServices namespace
+using System.Windows.Forms; //import the System.Windows.Forms namespace
+using static System.Windows.Forms.VisualStyles.VisualStyleElement; //import the static members of System.Windows.Forms.VisualStyles.VisualStyleElement
+using static WindowsFormsApp12.Form2; //import the static members of WindowsFormsApp12.Form2 namespace
+
+namespace WindowsFormsApp12
+{
+    public partial class Form2 : Form //Form2 class is a partial class and is derived from the System.Windows.Forms.Form class
+    {
+        private readonly List<string> _connectedDevices = new List<string>(); //private list field to store connected devices
+        private readonly ManagementEventWatcher _watcher; //private field of ManagementEventWatcher type
+        public class KeyboardHook //public class named KeyboardHook
+        {
+            private const int WH_KEYBOARD_LL = 13; //constant field to store the hook type of low level keyboard hook
+            private const int WM_KEYDOWN = 0x0100; //constant field to store the key down message constant
+            private const int WM_SYSKEYDOWN = 0x0104; //constant field to store the system key down message constant
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)] //import the "user32.dll" library to use the SetWindowsHookEx function
+            private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)] //import the "user32.dll" library to use the UnhookWindowsHookEx function
+            [return: MarshalAs(UnmanagedType.Bool)]
+            private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)] //import the "user32.dll" library to use the CallNextHookEx function
+            private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+            [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)] //import the "kernel32.dll" library to use the GetModuleHandle function
+            private static extern IntPtr GetModuleHandle(string lpModuleName);
+            private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam); //delegate of type LowLevelKeyboardProc to handle keyboard events
+            private IntPtr _hookId = IntPtr.Zero; //private field to store the hook ID
+            private LowLevelKeyboardProc _proc; //private field of delegate type
+            public bool BlockWindowsKey { get; set; } = false; //public property to get/set whether the Windows key is blocked or not, default value is false
+            public bool BloackWindowsKey { get; internal set; } //public property to get/set the Windows key blocked status but only within the same assembly, the set accessor is internal
+
+            public void Start() //Method to start the hook
+            {
+                _proc = HookCallback; //Assign the HookCallback method to the _proc field
+                using (Process curProcess = Process.GetCurrentProcess()) //Open a using block for the current process
+                using (ProcessModule curModule = curProcess.MainModule) //Open another using block for the current module
+                {
+                    _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(curModule.ModuleName), 0); //Call the SetWindowsHookEx function to set the hook and store the hook ID in the _hookId field
+                }
+            }
+            public void Stop() //Method to stop the hook
+            {
+                UnhookWindowsHookEx(_hookId); //Call the UnhookWindowsHookEx function to unhook the hook
+            }
+            private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam) //The callback method for the hook
+            {
+                if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN)) //If nCode is greater than or equal to 0 and wParam is equal to either WM_KEYDOWN or WM_SYSKEYDOWN 
+                {
+                    int vkCode = Marshal.ReadInt32(lParam); //Read the virtual-key code from lParam
+                    Keys key = (Keys)vkCode; //Cast the virtual-key code to the corresponding key in the Keys enumeration
+                                             // if (BlockWindowsKey && vkCode == (int)Keys.LWin) //If the Windows key is blocked and the virtual-key code is equal to the left Windows key
+                    if ((!char.IsLetter((char)key) || (BlockWindowsKey && vkCode == (int)Keys.LWin)) && vkCode != (int)Keys.Back && vkCode != (int)Keys.Enter) //If the key is not a letter or the Windows key is blocked
+                        {
+                        return (IntPtr)1; //Return 1 as the result of the hook procedure to block the Windows key
+                    }
+                }
+                return CallNextHookEx(_hookId, nCode, wParam, lParam); //Call the CallNextHookEx function to pass the message to the next hook procedure in the hook chain and return its result
+            }
+        }
+
+        private readonly KeyboardHook _hook = new KeyboardHook(); //Private field to store an instance of the KeyboardHook class
+        private readonly string _captcha; //Private readonly field to store the captcha string
+        public Form2() //Form constructor
+        {
+            InitializeComponent();
+            _hook.BlockWindowsKey = true; //Set the BlockWindowsKey property to true
+            _hook.Start(); //Start the hook
+            Random random = new Random();
+            char c1 = (char)random.Next(97, 123); //Generate a random lowercase character
+            char c2 = (char)random.Next(97, 123); //Generate another random lowercase character
+            char c3 = (char)random.Next(97, 123); //Generate yet another random lowercase character
+            _captcha = c1.ToString() + c2.ToString() + c3.ToString(); //Concatenate the three characters to form the captcha string
+            label1.Text = _captcha; //Set the text of the label to the captcha string
+            this.AcceptButton = button1; //Set the "AcceptButton" property of the form to the "button1" object.
+
+            var query = new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 3"); //Create a WqlEventQuery object that selects all events of type 3 from the Win32_DeviceChangeEvent class.
+
+            _watcher = new ManagementEventWatcher(query); //Create a new ManagementEventWatcher object using the query defined above.
+
+            _watcher.EventArrived += WatcherOnEventArrived; //Subscribe the "WatcherOnEventArrived" method to the "EventArrived" event of the "_watcher" object.
+
+            _watcher.Start(); //Start the event watcher.
+        }
+            private void UpdateConnectedDevices() //Declare a method called "UpdateConnectedDevices"
+            {
+                _connectedDevices.Clear(); //Clear the "_connectedDevices" list.
+                var searcher = new ManagementObjectSearcher("SELECT DeviceID FROM Win32_USBHub"); //Create a new ManagementObjectSearcher that selects the "DeviceID" property from instances of the "Win32_USBHub" class.
+                foreach (var device in searcher.Get()) //For each object returned by the searcher
+                {
+                    _connectedDevices.Add(device["DeviceID"].ToString()); //Add the "DeviceID" property of the current object to the "_connectedDevices" list.
+                }
+            }
+
+            private void WatcherOnEventArrived(object sender, EventArrivedEventArgs e) //Declare a method called "WatcherOnEventArrived" that is called when an event is received by the "_watcher" object.
+            {
+                if (this.InvokeRequired) //Check if the current thread is not the user interface thread.
+                {
+                    this.Invoke((MethodInvoker)delegate //If it is not, then call the "UpdateConnectedDevices" method using the "Invoke" method.
+                    {
+                        UpdateConnectedDevices(); //calls the UpdateConnectedDevices method to update the list of connected devices
+                        if (_connectedDevices.Count == 0) //if the count of connected devices is 0, then
+                            _hook.Stop(); // stop the hook
+                        _hook.BlockWindowsKey = false; //unblock the Windows key
+                        Close(); //close the program or form.
+                    });
+                }
+                else //If the current thread is the user interface thread, then call the "UpdateConnectedDevices" method directly.
+                {
+                UpdateConnectedDevices(); //calls the UpdateConnectedDevices method to update the list of connected devices
+                if (_connectedDevices.Count == 0) //if the count of connected devices is 0, then
+                    _hook.Stop(); // stop the hook
+                _hook.BlockWindowsKey = false; //unblock the Windows key
+                Close(); //close the program or form.
+            }
+            }
+
+            private void button1_Click_1(object sender, EventArgs e) //Declare a method called "button1_Click_1" that is called when the "button1" object is clicked.
+            {
+                if (textBox1.Text == _captcha) //Check if the text entered in the "textBox1" object is equal to the "_captcha" value.
+                {
+                    _hook.Stop(); //If it is, stop the "_hook" object.
+                    Close(); //Close the form.
+                }
+                else //If it is not equal, display an error message to the user.
+                {
+                    MessageBox.Show("Incorrect Captcha, Try Again", "NAH", MessageBoxButtons.RetryCancel, MessageBoxIcon.Error);
+                }
+        }
+    }
+    }
+using System;
+
+namespace WindowsFormsApp12
+{
+    partial class Form1
+    {
+        /// <summary>
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary>
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+
+        /// <summary>
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.button1 = new System.Windows.Forms.Button();
+            this.label1 = new System.Windows.Forms.Label();
+            this.label2 = new System.Windows.Forms.Label();
+            this.label3 = new System.Windows.Forms.Label();
+            this.label4 = new System.Windows.Forms.Label();
+            this.label5 = new System.Windows.Forms.Label();
+            this.label6 = new System.Windows.Forms.Label();
+            this.SuspendLayout();
+            // 
+            // button1
+            // 
+            this.button1.Location = new System.Drawing.Point(616, 277);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(10, 10);
+            this.button1.TabIndex = 0;
+            this.button1.Text = "button1";
+            this.button1.UseVisualStyleBackColor = true;
+            this.button1.Click += new System.EventHandler(this.button1_Click);
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Font = new System.Drawing.Font("Microsoft Uighur", 48F, ((System.Drawing.FontStyle)((System.Drawing.FontStyle.Bold | System.Drawing.FontStyle.Italic))), System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.ForeColor = System.Drawing.Color.Turquoise;
+            this.label1.Location = new System.Drawing.Point(292, 227);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(777, 75);
+            this.label1.TabIndex = 1;
+            this.label1.Text = "Welcome to Rubber Ducky Interceptor";
+            this.label1.Click += new System.EventHandler(this.label1_Click);
+            // 
+            // label2
+            // 
+            this.label2.AutoSize = true;
+            this.label2.BackColor = System.Drawing.SystemColors.ActiveCaptionText;
+            this.label2.Font = new System.Drawing.Font("MV Boli", 26.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label2.Location = new System.Drawing.Point(381, 333);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(444, 46);
+            this.label2.TabIndex = 2;
+            this.label2.Text = "The Service is Currently :";
+            // 
+            // label3
+            // 
+            this.label3.AutoSize = true;
+            this.label3.Font = new System.Drawing.Font("Georgia", 36F, ((System.Drawing.FontStyle)((System.Drawing.FontStyle.Bold | System.Drawing.FontStyle.Italic))), System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label3.ForeColor = System.Drawing.Color.Crimson;
+            this.label3.Location = new System.Drawing.Point(831, 326);
+            this.label3.Name = "label3";
+            this.label3.Size = new System.Drawing.Size(188, 60);
+            this.label3.TabIndex = 3;
+            this.label3.Text = "Running";
+            // 
+            // label4
+            // 
+            this.label4.AutoEllipsis = true;
+            this.label4.AutoSize = true;
+            this.label4.ForeColor = System.Drawing.Color.Red;
+            this.label4.Location = new System.Drawing.Point(322, 43);
+            this.label4.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(747, 13);
+            this.label4.TabIndex = 4;
+            this.label4.Text = "this is just a proof of concept, the whole program was mostly coded by A.i and in" +
+    " no means is considered secure, it is just implementing the idea of interruption" +
+    " ";
+            this.label4.Click += new System.EventHandler(this.label4_Click);
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.ForeColor = System.Drawing.Color.Red;
+            this.label5.Location = new System.Drawing.Point(260, 68);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(864, 13);
+            this.label5.TabIndex = 5;
+            this.label5.Text = "at over the shelf rubber ducky scripts, please aknowledge that delays and alterin" +
+    "g the ducky script can bypass this method so i strongly advice you to combine mo" +
+    "re than one security ";
+            // 
+            // label6
+            // 
+            this.label6.AutoSize = true;
+            this.label6.ForeColor = System.Drawing.Color.Red;
+            this.label6.Location = new System.Drawing.Point(465, 90);
+            this.label6.Name = "label6";
+            this.label6.Size = new System.Drawing.Size(415, 13);
+            this.label6.TabIndex = 6;
+            this.label6.Text = "feature in order to mitigate the risks of a rubber ducky attack to the lowest. -N" +
+    "ouredden";
+            // 
+            // Form1
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.SystemColors.ActiveCaptionText;
+            this.ClientSize = new System.Drawing.Size(1030, 450);
+            this.Controls.Add(this.label6);
+            this.Controls.Add(this.label5);
+            this.Controls.Add(this.label4);
+            this.Controls.Add(this.label3);
+            this.Controls.Add(this.label2);
+            this.Controls.Add(this.label1);
+            this.Controls.Add(this.button1);
+            this.ForeColor = System.Drawing.SystemColors.ControlLight;
+            this.Name = "Form1";
+            this.Opacity = 0.9D;
+            this.Text = "Form1";
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+            this.Load += new System.EventHandler(this.Form1_Load);
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
+        }
+
+
+
+        #endregion
+
+        private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.Label label6;
+    }
+}
+
+namespace WindowsFormsApp12
+{
+    partial class Form2
+    {
+        /// <summary>
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary>
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Windows Form Designer generated code
+
+        /// <summary>
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.button1 = new System.Windows.Forms.Button();
+            this.label1 = new System.Windows.Forms.Label();
+            this.SuspendLayout();
+            // 
+            // textBox1
+            // 
+            this.textBox1.Location = new System.Drawing.Point(611, 482);
+            this.textBox1.Margin = new System.Windows.Forms.Padding(2);
+            this.textBox1.Name = "textBox1";
+            this.textBox1.Size = new System.Drawing.Size(136, 20);
+            this.textBox1.TabIndex = 0;
+            this.textBox1.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            // 
+            // button1
+            // 
+            this.button1.BackColor = System.Drawing.SystemColors.Highlight;
+            this.button1.FlatAppearance.BorderSize = 0;
+            this.button1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.button1.Font = new System.Drawing.Font("Microsoft Sans Serif", 24F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.button1.ForeColor = System.Drawing.SystemColors.ControlLightLight;
+            this.button1.Location = new System.Drawing.Point(611, 522);
+            this.button1.Margin = new System.Windows.Forms.Padding(2);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(136, 45);
+            this.button1.TabIndex = 1;
+            this.button1.Text = "Verify";
+            this.button1.UseVisualStyleBackColor = false;
+            this.button1.Click += new System.EventHandler(this.button1_Click_1);
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.BackColor = System.Drawing.Color.Black;
+            this.label1.Font = new System.Drawing.Font("Segoe UI", 27.75F, ((System.Drawing.FontStyle)((((System.Drawing.FontStyle.Bold | System.Drawing.FontStyle.Italic) 
+                | System.Drawing.FontStyle.Underline) 
+                | System.Drawing.FontStyle.Strikeout))), System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.ForeColor = System.Drawing.Color.DeepSkyBlue;
+            this.label1.Location = new System.Drawing.Point(636, 400);
+            this.label1.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(159, 57);
+            this.label1.TabIndex = 2;
+            this.label1.Text = "Captcha";
+            this.label1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.label1.UseCompatibleTextRendering = true;
+            // 
+            // Form2
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.Black;
+            this.ClientSize = new System.Drawing.Size(1024, 609);
+            this.Controls.Add(this.label1);
+            this.Controls.Add(this.button1);
+            this.Controls.Add(this.textBox1);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
+            this.Margin = new System.Windows.Forms.Padding(2);
+            this.Name = "Form2";
+            this.Opacity = 0.85D;
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Text = "Form1";
+            this.TransparencyKey = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(50)))));
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+            this.ResumeLayout(false);
+            this.PerformLayout();
+
+        }
+
+        #endregion
+
+        private System.Windows.Forms.TextBox textBox1;
+        private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.Label label1;
+
+        #region Windows Form Designer generated code
+
+        /// <summary>
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
+        /// </summary>
+
+
+        #endregion
+    }
+}using System; //Imports the .NET System namespace
+using System.Collections.Generic; //Imports the System.Collections.Generic namespace
+using System.Linq; //Imports the System.Linq namespace
+using System.Threading.Tasks; //Imports the System.Threading.Tasks namespace
+using System.Windows.Forms; //Imports the System.Windows.Forms namespace
+
+namespace WindowsFormsApp12 //Declares the namespace for this project as "WindowsFormsApp12"
+{
+    internal static class Program //Declares a static class named "Program"
+    {
+        /// <summary>
+        /// The main entry point for the application.
+        /// </summary>
+        [STAThread] //Declares the Main method as STAThread
+        static void Main()
+        {
+            Application.EnableVisualStyles(); //Enables visual styles for the application
+            Application.SetCompatibleTextRenderingDefault(false); //Sets the default text rendering to not be compatible
+            Application.Run(new Form1()); //Runs the Form1 object, starting the application
+        }
+    }
+}using System; //import the System namespace
+using System.Collections.Generic; //import the System.Collections.Generic namespace
+using System.Diagnostics; //import the System.Diagnostics namespace
+using System.Management; //import the System.Management namespace
+using System.Reflection.Emit; //import the System.Reflection.Emit namespace
+using System.Runtime.InteropServices; //import the System.Runtime.InteropServices namespace
+using System.Windows.Forms; //import the System.Windows.Forms namespace
+using static System.Windows.Forms.VisualStyles.VisualStyleElement; //import the static members of System.Windows.Forms.VisualStyles.VisualStyleElement
+using static WindowsFormsApp12.Form2; //import the static members of WindowsFormsApp12.Form2 namespace
+
+namespace WindowsFormsApp12
+{
+    public partial class Form2 : Form //Form2 class is a partial class and is derived from the System.Windows.Forms.Form class
+    {
+        private readonly List<string> _connectedDevices = new List<string>(); //private list field to store connected devices
+        private readonly ManagementEventWatcher _watcher; //private field of ManagementEventWatcher type
+        public class KeyboardHook //public class named KeyboardHook
+        {
+            private const int WH_KEYBOARD_LL = 13; //constant field to store the hook type of low level keyboard hook
+            private const int WM_KEYDOWN = 0x0100; //constant field to store the key down message constant
+            private const int WM_SYSKEYDOWN = 0x0104; //constant field to store the system key down message constant
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)] //import the "user32.dll" library to use the SetWindowsHookEx function
+            private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)] //import the "user32.dll" library to use the UnhookWindowsHookEx function
+            [return: MarshalAs(UnmanagedType.Bool)]
+            private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)] //import the "user32.dll" library to use the CallNextHookEx function
+            private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+            [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)] //import the "kernel32.dll" library to use the GetModuleHandle function
+            private static extern IntPtr GetModuleHandle(string lpModuleName);
+            private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam); //delegate of type LowLevelKeyboardProc to handle keyboard events
+            private IntPtr _hookId = IntPtr.Zero; //private field to store the hook ID
+            private LowLevelKeyboardProc _proc; //private field of delegate type
+            public bool BlockWindowsKey { get; set; } = false; //public property to get/set whether the Windows key is blocked or not, default value is false
+            public bool BloackWindowsKey { get; internal set; } //public property to get/set the Windows key blocked status but only within the same assembly, the set accessor is internal
+
+            public void Start() //Method to start the hook
+            {
+                _proc = HookCallback; //Assign the HookCallback method to the _proc field
+                using (Process curProcess = Process.GetCurrentProcess()) //Open a using block for the current process
+                using (ProcessModule curModule = curProcess.MainModule) //Open another using block for the current module
+                {
+                    _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(curModule.ModuleName), 0); //Call the SetWindowsHookEx function to set the hook and store the hook ID in the _hookId field
+                }
+            }
+            public void Stop() //Method to stop the hook
+            {
+                UnhookWindowsHookEx(_hookId); //Call the UnhookWindowsHookEx function to unhook the hook
+            }
+            private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam) //The callback method for the hook
+            {
+                if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN)) //If nCode is greater than or equal to 0 and wParam is equal to either WM_KEYDOWN or WM_SYSKEYDOWN 
+                {
+                    int vkCode = Marshal.ReadInt32(lParam); //Read the virtual-key code from lParam
+                    Keys key = (Keys)vkCode; //Cast the virtual-key code to the corresponding key in the Keys enumeration
+                                             // if (BlockWindowsKey && vkCode == (int)Keys.LWin) //If the Windows key is blocked and the virtual-key code is equal to the left Windows key
+                    if ((!char.IsLetter((char)key) || (BlockWindowsKey && vkCode == (int)Keys.LWin)) && vkCode != (int)Keys.Back && vkCode != (int)Keys.Enter) //If the key is not a letter or the Windows key is blocked
+                        {
+                        return (IntPtr)1; //Return 1 as the result of the hook procedure to block the Windows key
+                    }
+                }
+                return CallNextHookEx(_hookId, nCode, wParam, lParam); //Call the CallNextHookEx function to pass the message to the next hook procedure in the hook chain and return its result
+            }
+        }
+
+        private readonly KeyboardHook _hook = new KeyboardHook(); //Private field to store an instance of the KeyboardHook class
+        private readonly string _captcha; //Private readonly field to store the captcha string
+        public Form2() //Form constructor
+        {
+            InitializeComponent();
+            _hook.BlockWindowsKey = true; //Set the BlockWindowsKey property to true
+            _hook.Start(); //Start the hook
+            Random random = new Random();
+            char c1 = (char)random.Next(97, 123); //Generate a random lowercase character
+            char c2 = (char)random.Next(97, 123); //Generate another random lowercase character
+            char c3 = (char)random.Next(97, 123); //Generate yet another random lowercase character
+            _captcha = c1.ToString() + c2.ToString() + c3.ToString(); //Concatenate the three characters to form the captcha string
+            label1.Text = _captcha; //Set the text of the label to the captcha string
+            this.AcceptButton = button1; //Set the "AcceptButton" property of the form to the "button1" object.
+
+            var query = new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 3"); //Create a WqlEventQuery object that selects all events of type 3 from the Win32_DeviceChangeEvent class.
+
+            _watcher = new ManagementEventWatcher(query); //Create a new ManagementEventWatcher object using the query defined above.
+
+            _watcher.EventArrived += WatcherOnEventArrived; //Subscribe the "WatcherOnEventArrived" method to the "EventArrived" event of the "_watcher" object.
+
+            _watcher.Start(); //Start the event watcher.
+        }
+            private void UpdateConnectedDevices() //Declare a method called "UpdateConnectedDevices"
+            {
+                _connectedDevices.Clear(); //Clear the "_connectedDevices" list.
+                var searcher = new ManagementObjectSearcher("SELECT DeviceID FROM Win32_USBHub"); //Create a new ManagementObjectSearcher that selects the "DeviceID" property from instances of the "Win32_USBHub" class.
+                foreach (var device in searcher.Get()) //For each object returned by the searcher
+                {
+                    _connectedDevices.Add(device["DeviceID"].ToString()); //Add the "DeviceID" property of the current object to the "_connectedDevices" list.
+                }
+            }
+
+            private void WatcherOnEventArrived(object sender, EventArrivedEventArgs e) //Declare a method called "WatcherOnEventArrived" that is called when an event is received by the "_watcher" object.
+            {
+                if (this.InvokeRequired) //Check if the current thread is not the user interface thread.
+                {
+                    this.Invoke((MethodInvoker)delegate //If it is not, then call the "UpdateConnectedDevices" method using the "Invoke" method.
+                    {
+                        UpdateConnectedDevices(); //calls the UpdateConnectedDevices method to update the list of connected devices
+                        if (_connectedDevices.Count == 0) //if the count of connected devices is 0, then
+                            _hook.Stop(); // stop the hook
+                        _hook.BlockWindowsKey = false; //unblock the Windows key
+                        Close(); //close the program or form.
+                    });
+                }
+                else //If the current thread is the user interface thread, then call the "UpdateConnectedDevices" method directly.
+                {
+                UpdateConnectedDevices(); //calls the UpdateConnectedDevices method to update the list of connected devices
+                if (_connectedDevices.Count == 0) //if the count of connected devices is 0, then
+                    _hook.Stop(); // stop the hook
+                _hook.BlockWindowsKey = false; //unblock the Windows key
+                Close(); //close the program or form.
+            }
+            }
+
+            private void button1_Click_1(object sender, EventArgs e) //Declare a method called "button1_Click_1" that is called when the "button1" object is clicked.
+            {
+                if (textBox1.Text == _captcha) //Check if the text entered in the "textBox1" object is equal to the "_captcha" value.
+                {
+                    _hook.Stop(); //If it is, stop the "_hook" object.
+                    Close(); //Close the form.
+                }
+                else //If it is not equal, display an error message to the user.
+                {
+                    MessageBox.Show("Incorrect Captcha, Try Again", "NAH", MessageBoxButtons.RetryCancel, MessageBoxIcon.Error);
+                }
+        }
+
+        private void Form2_Load(object sender, EventArgs e)
+        {
+
+        }
+    }
+    }
+using System; //Imports the .NET System namespace
+using System.Collections;
+using System.Collections.Generic; //Imports the System.Collections.Generic namespace
+using System.Diagnostics; //Imports the System.Diagnostics namespace
+using System.Management; //Imports the System.Management namespace
+using System.Runtime.InteropServices; //Imports the System.Runtime.InteropServices namespace
+using System.Windows.Forms; //Imports the System.Windows.Forms namespace
+using static WindowsFormsApp12.Form2; //Imports the static class Form2 in the namespace WindowsFormsApp12
+namespace WindowsFormsApp12 //Declares the namespace for this project as "WindowsFormsApp12"
+{
+    public partial class Form1 : Form //Declares a partial public class named "Form1" that inherits from the Form class
+    {
+        private readonly List<string> _connectedDevices = new List<string>(); //Declares a readonly list of strings named "_connectedDevices" and initializes it as an empty list
+        private readonly ManagementEventWatcher _watcher; //Declares a readonly instance of ManagementEventWatcher named "_watcher"
+        public Form1() {  //Declares a public constructor for the Form1 class
+        InitializeComponent(); //Initializes the component for this form
+        var query = new WqlEventQuery("SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 2"); //Declares a variable of type WqlEventQuery with the query "SELECT * FROM Win32_DeviceChangeEvent WHERE EventType = 2"
+        _watcher = new ManagementEventWatcher(query); //Initializes the "_watcher" variable with the specified query
+        _watcher.EventArrived += WatcherOnEventArrived; //Assigns the "WatcherOnEventArrived" method to the EventArrived event of "_watcher"
+        _watcher.Start(); //Starts the "_watcher" event
+        }
+
+        private void WatcherOnEventArrived(object sender, EventArrivedEventArgs e) //Declares the "WatcherOnEventArrived" method that is triggered when an event arrives
+        {
+            UpdateConnectedDevices(); //Calls the "UpdateConnectedDevices" method
+            if (_connectedDevices.Count > 0) //Checks if the count of "_connectedDevices" is greater than 0
+            {
+                if (button1.InvokeRequired) //Checks if the Invoke method is required to be called for the "button1" object
+                {
+                    button1.Invoke((MethodInvoker)delegate //Invokes the delegate method to call the "PerformClick" method on the "button1" object
+                    {
+                        button1.PerformClick(); //Calls the "PerformClick" method on the "button1" object
+                    });
+                }
+                else
+                {
+                    button1.PerformClick(); //Calls the "PerformClick" method on the "button1" object
+                }
+            }
+
+
+
+        }
+        private void UpdateConnectedDevices() //Declares the "UpdateConnectedDevices" method
+        {
+            _connectedDevices.Clear(); //Clears the "_connectedDevices" list
+            var searcher = new ManagementObjectSearcher("SELECT DeviceID FROM Win32_USBHub"); //Declares a variable of type ManagementObjectSearcher and sets the query to select the device ID from the Win32_USBHub class.
+
+            foreach (var device in searcher.Get()) //Iterates through the result of the query
+            {
+                _connectedDevices.Add(device["DeviceID"].ToString()); //Adds the device ID to the "_connectedDevices" list
+            }
+        }
+
+        private void button1_Click(object sender, EventArgs e) //Event handler for the button1 click event
+        {
+            bool form2Open = false; //Flag to check if Form2 is already open
+            foreach (Form f in Application.OpenForms) //Iterates through all the open forms
+            {
+                if (f is Form2) //Checks if the form is of type Form2
+                {
+                    form2Open = true; //Sets the flag to true
+                    break;
+                }
+            }
+
+            if (!form2Open) //If the form2 is not open
+            {
+                Form2 form2 = new Form2(); //Create a new instance of Form2
+                form2.Show(); //Show the form
+            }
+        }
+
+
+        private void label1_Click(object sender, EventArgs e) //Event handler for the label1 click event
+        {
+
+        }
+
+        private void label4_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+    }
+}
